@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nva.recipe.rocket"
+version = "0.1.0.dev0"
+description = "zc.buildout extension: build develop eggs in parallel, without build isolation, and reuse unchanged ones"
+readme = "README.md"
+license = { text = "ZPL-2.1" }
+license-files = ["LICENSE.txt"]
+requires-python = ">=3.9"
+authors = [{ name = "Novareto", email = "ck@novareto.de" }]
+keywords = ["buildout", "extension", "develop", "mr.developer", "performance"]
+classifiers = [
+    "Framework :: Buildout",
+    "Framework :: Buildout :: Extension",
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: Zope Public License",
+]
+dependencies = ["zc.buildout>=5"]
+
+[project.urls]
+Homepage = "https://github.com/novareto/nva.recipe.rocket"
+Issues = "https://github.com/novareto/nva.recipe.rocket/issues"
+Changelog = "https://github.com/novareto/nva.recipe.rocket/blob/main/CHANGES.md"
+
+[project.entry-points."zc.buildout.extension"]
+default = "nva.recipe.rocket:extension"
+
+[dependency-groups]
+dev = ["pytest", "setuptools<81", "pip"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nva"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
