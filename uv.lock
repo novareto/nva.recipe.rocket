@@ -55,7 +55,7 @@ wheels = [
 
 [[package]]
 name = "nva-recipe-rocket"
-version = "0.1.0"
+version = "0.1.1.dev0"
 source = { editable = "." }
 dependencies = [
     { name = "zc-buildout", version = "5.2.0", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.10'" },
