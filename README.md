@@ -22,8 +22,8 @@ even when nothing changed.
 - **Cache** — the files a develop egg generates in `develop-eggs/` are cached.
   On the next run they are copied back instead of rebuilt, as long as the
   package's `setup.py`, `setup.cfg`, `pyproject.toml` and its top-level
-  package layout are unchanged. Code changes never need a rebuild — editable
-  installs point at the source directory.
+  package layout are unchanged. A git checkout is also rebuilt when its
+  commit or its uncommitted changes differ from the cached build.
 
 Measured on a project with 22 mr.developer checkouts:
 
@@ -65,11 +65,16 @@ The cache key of a develop egg is made from:
 - the names of the top-level packages and modules (flat layout and src
   layout, two levels deep for namespace packages) and the `*.egg-info`
   directory,
+- for a git checkout: the checked out commit and its uncommitted changes
+  (modified, staged and untracked files that are not ignored, with their
+  size and modification time),
 - the Python interpreter, the zc.buildout, setuptools and pip versions,
 - the `rocket-build-isolation` setting.
 
-Anything else that affects the generated metadata is **not** seen, for
-example a version computed from git tags (setuptools-scm). Run once with
+So a checkout is rebuilt after a `git pull`, a branch switch or a local
+edit, and only that checkout. Outside of git, or for things git does not
+show (ignored files, a new tag on the same commit for setuptools-scm),
+changes that affect the generated metadata are **not** seen. Run once with
 `buildout:rocket-cache=false`, or delete `parts/.rocket`, to force a rebuild.
 
 ## Other things that make buildout slow

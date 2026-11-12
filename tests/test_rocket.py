@@ -1,4 +1,5 @@
 import os
+import subprocess
 import textwrap
 
 import pytest
@@ -116,6 +117,69 @@ def test_new_top_level_package_rebuilds(project, develop_calls):
     (project / "pkgb" / "src" / "pkgb_extra").mkdir()
     run_buildout(project)
     assert develop_calls == ["pkgb"]
+
+
+def git(directory, *args):
+    subprocess.run(
+        ["git", "-c", "user.name=test", "-c", "user.email=test@example.com", *args],
+        cwd=directory,
+        check=True,
+        capture_output=True,
+    )
+
+
+@pytest.fixture
+def checkout(project, develop_calls):
+    """``pkga`` is a git checkout that was developed (and cached) once."""
+    pkga = project / "pkga"
+    (pkga / ".gitignore").write_text("*.egg-info\nbuild\n__pycache__\n")
+    (pkga / "version.txt").write_text("1.0\n")
+    git(pkga, "init", "-q")
+    git(pkga, "add", ".")
+    git(pkga, "commit", "-q", "-m", "initial")
+    run_buildout(project)
+    develop_calls.clear()
+    return pkga
+
+
+def test_clean_checkout_is_cached(project, checkout, develop_calls):
+    run_buildout(project)
+    assert develop_calls == []
+
+
+def test_uncommitted_change_rebuilds_only_that_checkout(
+    project, checkout, develop_calls
+):
+    (checkout / "version.txt").write_text("1.1.dev0\n")
+    run_buildout(project)
+    assert develop_calls == ["pkga"]
+
+    # The same uncommitted change is cached ...
+    develop_calls.clear()
+    run_buildout(project)
+    assert develop_calls == []
+
+    # ... until the file is edited again.
+    (checkout / "version.txt").write_text("1.1.dev0+local\n")
+    run_buildout(project)
+    assert develop_calls == ["pkga"]
+
+
+def test_untracked_file_rebuilds(project, checkout, develop_calls):
+    (checkout / "MANIFEST.in").write_text("include version.txt\n")
+    run_buildout(project)
+    assert develop_calls == ["pkga"]
+
+
+def test_new_commit_rebuilds(project, checkout, develop_calls):
+    git(checkout, "commit", "-q", "--allow-empty", "-m", "second")
+    run_buildout(project)
+    assert develop_calls == ["pkga"]
+
+
+def test_git_state_outside_of_a_checkout(tmp_path, monkeypatch):
+    monkeypatch.setenv("GIT_CEILING_DIRECTORIES", str(tmp_path.parent))
+    assert rocket._git_state(tmp_path) == []
 
 
 def test_cache_can_be_disabled(project, develop_calls):

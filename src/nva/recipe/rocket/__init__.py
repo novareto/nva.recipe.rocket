@@ -8,7 +8,8 @@ a fresh isolated build environment.  This extension replaces that step:
 * builds run without pip build isolation, falling back to an isolated build
   per package if that fails (``rocket-build-isolation``),
 * the generated files of every develop egg are cached and restored as long
-  as its packaging metadata did not change (``rocket-cache``).
+  as its packaging metadata and, for git checkouts, its commit and
+  uncommitted changes did not change (``rocket-cache``).
 """
 
 import glob
@@ -16,6 +17,7 @@ import hashlib
 import logging
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -39,6 +41,10 @@ KEY_FILES = ("setup.py", "setup.cfg", "pyproject.toml")
 
 #: Marker written into a cache entry once it is complete.
 COMPLETE = ".rocket-complete"
+
+#: Number of space separated fields before the path in the entries of
+#: ``git status --porcelain=v2``: changed, renamed, unmerged, untracked.
+_STATUS_FIELDS = {b"1": 8, b"2": 9, b"u": 10, b"?": 1}
 
 _local = threading.local()
 _get_subprocess_output = easy_install.get_subprocess_output
@@ -140,6 +146,68 @@ def _dist_version(name):
         return ""
 
 
+def _git_state(directory):
+    """Describe the git state of a checkout: its commit and local changes.
+
+    Returns the checked out commit plus one entry per modified, staged or
+    untracked path below ``directory``, each with the size and mtime of the
+    file, so that editing a changed file again is noticed as well.  Returns
+    an empty list if ``directory`` is not inside a git work tree or git is
+    not available.
+    """
+    try:
+        result = subprocess.run(
+            [
+                "git",
+                "--no-optional-locks",
+                "-C",
+                str(directory),
+                "status",
+                "--porcelain=v2",
+                "--branch",
+                "-z",
+                "--untracked-files=normal",
+                "--",
+                ".",
+            ],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            timeout=60,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return []
+    if result.returncode:
+        return []
+    # Paths in the output are relative to the root of the work tree.
+    root = next(
+        (p for p in (directory, *directory.parents) if (p / ".git").exists()),
+        directory,
+    )
+    state = []
+    tokens = iter(result.stdout.split(b"\0"))
+    for token in tokens:
+        if token.startswith(b"# "):
+            # Only the commit; the upstream ahead/behind counts change on fetch.
+            if token.startswith(b"# branch.oid "):
+                state.append(token)
+            continue
+        fields = _STATUS_FIELDS.get(token[:1])
+        if fields is None:
+            continue
+        state.append(token)
+        path = root / os.fsdecode(token.split(b" ", fields)[-1])
+        if token[:1] == b"2":
+            # Renames are followed by the original path.
+            state.append(next(tokens, b""))
+        try:
+            info = os.lstat(path)
+        except OSError:
+            continue  # deleted
+        if not stat.S_ISDIR(info.st_mode):
+            state.append(f"{info.st_size}:{info.st_mtime_ns}".encode())
+    return state
+
+
 def cache_key(directory, settings):
     digest = hashlib.sha256()
 
@@ -155,6 +223,7 @@ def cache_key(directory, settings):
         path = directory / name
         add(name, path.read_bytes() if path.is_file() else b"-")
     add(*_listing(directory))
+    add(*_git_state(directory))
     return digest.hexdigest()
 
 

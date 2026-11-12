@@ -2,7 +2,8 @@
 
 ## 0.1.1 (unreleased)
 
-- Nothing changed yet.
+- The cache notices changes in git checkouts: a develop egg is rebuilt when
+  its commit or its uncommitted changes differ from the cached build.
 
 ## 0.1.0 (2026-10-24)
 
