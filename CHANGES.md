@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.1 (unreleased)
+## 0.1.1 (2026-11-12)
 
 - The cache notices changes in git checkouts: a develop egg is rebuilt when
   its commit or its uncommitted changes differ from the cached build.
