@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 (unreleased)
+
+- Nothing changed yet.
+
 ## 0.1.1 (2026-11-12)
 
 - The cache notices changes in git checkouts: a develop egg is rebuilt when
