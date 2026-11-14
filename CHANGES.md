@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3 (unreleased)
+
+- Nothing changed yet.
+
 ## 0.1.2 (2026-11-14)
 
 - Fix: a fresh checkout built without build isolation had no `*.egg-info`
