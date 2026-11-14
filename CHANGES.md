@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.2 (unreleased)
+## 0.1.2 (2026-11-14)
 
 - Fix: a fresh checkout built without build isolation had no `*.egg-info`
   in its source directory, so buildout did not recognise the develop egg and
