@@ -193,6 +193,41 @@ def test_sequential_worker(project, develop_calls):
     assert sorted(develop_calls) == ["pkga", "pkgb"]
 
 
+def test_fresh_checkout_gets_metadata(project):
+    """buildout only recognises a develop egg if its egg-link points at a
+    directory with metadata; a build without isolation does not write any."""
+    assert not list(project.glob("pkg*/**/*.egg-info"))
+    run_buildout(project)
+    assert (project / "pkga" / "pkga.egg-info" / "PKG-INFO").is_file()
+    assert (project / "pkgb" / "src" / "pkgb.egg-info" / "PKG-INFO").is_file()
+
+
+def test_no_metadata_falls_back_to_build_isolation(project, monkeypatch):
+    attempts = []
+    original = easy_install.develop
+
+    def develop(setup, dest, *args, **kw):
+        attempts.append(not getattr(rocket._local, "no_isolation", False))
+        rocket._local.no_isolation = True  # we are offline
+        return original(setup, dest, *args, **kw)
+
+    monkeypatch.setattr(easy_install, "develop", develop)
+    monkeypatch.setattr(rocket, "_write_metadata", lambda directory: None)
+    (project / "buildout.cfg").write_text(
+        "[buildout]\ndevelop = pkga\nparts =\noffline = true\nnewest = false\n"
+    )
+    run_buildout(project, "buildout:rocket-workers=1")
+    assert attempts == [False, True]
+
+
+def test_other_build_backends_are_left_alone(project):
+    (project / "pkga" / "pyproject.toml").write_text(
+        '[build-system]\nrequires = ["hatchling"]\nbuild-backend = "hatchling.build"\n'
+    )
+    assert not rocket._uses_setuptools(project / "pkga")
+    assert rocket._uses_setuptools(project / "pkgb")
+
+
 def test_falls_back_to_build_isolation(project, monkeypatch):
     attempts = []
     original = easy_install.develop

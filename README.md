@@ -18,7 +18,9 @@ even when nothing changed.
 - **No build isolation** — `pip install -e --no-build-isolation` uses the
   setuptools buildout already runs with. If that fails for a package (for
   example its build backend, like hatchling, is not installed), only that
-  package is retried with isolation.
+  package is retried with isolation. pip skips writing the `*.egg-info`
+  directory in this mode, which buildout needs to recognise the develop egg;
+  for setuptools projects it is generated in a separate, cheap step.
 - **Cache** — the files a develop egg generates in `develop-eggs/` are cached.
   On the next run they are copied back instead of rebuilt, as long as the
   package's `setup.py`, `setup.cfg`, `pyproject.toml` and its top-level

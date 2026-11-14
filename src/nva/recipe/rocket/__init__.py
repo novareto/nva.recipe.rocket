@@ -6,7 +6,8 @@ a fresh isolated build environment.  This extension replaces that step:
 
 * develop eggs are built in parallel (``rocket-workers``),
 * builds run without pip build isolation, falling back to an isolated build
-  per package if that fails (``rocket-build-isolation``),
+  per package if that fails (``rocket-build-isolation``); the metadata such
+  a build does not write into the source directory is generated separately,
 * the generated files of every develop egg are cached and restored as long
   as its packaging metadata and, for git checkouts, its commit and
   uncommitted changes did not change (``rocket-cache``).
@@ -16,6 +17,7 @@ import glob
 import hashlib
 import logging
 import os
+import re
 import shutil
 import stat
 import subprocess
@@ -251,12 +253,68 @@ def _copy_into(source, dest):
     return copied
 
 
+_BUILD_BACKEND = re.compile(r"""^\s*build-backend\s*=\s*["']([^"']+)""", re.M)
+
+#: What pip runs first in an isolated build of a setuptools project.  As a
+#: side effect it writes the ``*.egg-info`` directory into the source tree.
+_WRITE_METADATA = (
+    "from setuptools import build_meta; "
+    "build_meta.get_requires_for_build_editable()"
+)
+
+
+def _has_metadata(directory):
+    """Is there metadata where buildout's egg-link for ``directory`` points?
+
+    buildout links ``<directory>/src`` if that exists, else ``<directory>``,
+    and only recognises the develop egg if it finds its metadata there.
+    Without it, buildout silently installs a release from the index instead.
+    """
+    base = directory / "src" if (directory / "src").exists() else directory
+    return any(base.glob("*.egg-info")) or any(base.glob("*.dist-info"))
+
+
+def _uses_setuptools(directory):
+    pyproject = directory / "pyproject.toml"
+    if not pyproject.is_file():
+        return True
+    match = _BUILD_BACKEND.search(pyproject.read_text("utf-8", "replace"))
+    return match is None or match.group(1).startswith("setuptools")
+
+
+def _write_metadata(directory):
+    """Write the ``*.egg-info`` of a setuptools project into its source tree.
+
+    pip skips this step when it builds without isolation, so a fresh
+    checkout would be left without metadata.
+    """
+    env = os.environ.copy()
+    env["PYTHONPATH"] = os.pathsep.join(
+        [*getattr(easy_install, "pip_path", ()), env.get("PYTHONPATH", "")]
+    )
+    result = subprocess.run(
+        [sys.executable, "-c", _WRITE_METADATA],
+        cwd=directory,
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    if result.returncode:
+        logger.debug(result.stdout.decode("utf-8", "replace"))
+
+
 def _build(setup, staging, settings):
     if not settings.build_isolation:
+        directory = _project_directory(setup)
         _local.no_isolation = True
         try:
             easy_install.develop(setup, str(staging))
-            return
+            if _has_metadata(directory) or not _uses_setuptools(directory):
+                return
+            _write_metadata(directory)
+            if _has_metadata(directory):
+                return
+            raise NoIsolationFailed("the build wrote no metadata")
         except NoIsolationFailed as error:
             logger.info(
                 "Building %r without build isolation failed, "

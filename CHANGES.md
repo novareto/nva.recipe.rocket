@@ -2,7 +2,11 @@
 
 ## 0.1.2 (unreleased)
 
-- Nothing changed yet.
+- Fix: a fresh checkout built without build isolation had no `*.egg-info`
+  in its source directory, so buildout did not recognise the develop egg and
+  installed a release from the index instead. The metadata of setuptools
+  projects is now written separately; if that does not work either, the
+  package is rebuilt with isolation.
 
 ## 0.1.1 (2026-11-12)
 
