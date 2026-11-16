@@ -11,6 +11,10 @@ a fresh isolated build environment.  This extension replaces that step:
 * the generated files of every develop egg are cached and restored as long
   as its packaging metadata and, for git checkouts, its commit and
   uncommitted changes did not change (``rocket-cache``).
+
+Independent of the develop step, ``rocket-scan-index = false`` stops
+buildout from downloading the root page of the package index when a package
+has no page of its own there.
 """
 
 import glob
@@ -70,6 +74,7 @@ class Settings:
     build_isolation: bool
     cache: bool
     cache_directory: Path
+    scan_index: bool = True
 
     @classmethod
     def from_buildout(cls, buildout):
@@ -85,6 +90,7 @@ class Settings:
             build_isolation=_bool(options.get("rocket-build-isolation", "false")),
             cache=_bool(options.get("rocket-cache", "true")),
             cache_directory=Path(cache_directory),
+            scan_index=_bool(options.get("rocket-scan-index", "true")),
         )
 
 
@@ -427,6 +433,17 @@ def _develop(self, settings):
         os.chdir(here)
 
 
+def scan_all(self, msg=None, *args):
+    """Replacement for ``PackageIndex.scan_all`` that scans nothing.
+
+    buildout calls it when a package has no page of its own on the index and
+    then downloads and parses the root page, which lists every package: on
+    PyPI about a million links.  The page of a package is already requested
+    under its normalised name, so the root page does not help to find it.
+    """
+    logger.debug("Not scanning the index of all packages (rocket-scan-index).")
+
+
 def extension(buildout):
     """Entry point for ``extensions = nva.recipe.rocket``."""
     if not hasattr(easy_install, "call_pip_install"):
@@ -436,6 +453,8 @@ def extension(buildout):
         return
     settings = Settings.from_buildout(buildout)
     easy_install.get_subprocess_output = get_subprocess_output
+    if not settings.scan_index:
+        easy_install.AllowHostsPackageIndex.scan_all = scan_all
     buildout._develop = types.MethodType(
         lambda self: _develop(self, settings), buildout
     )

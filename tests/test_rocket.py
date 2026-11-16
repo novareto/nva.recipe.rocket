@@ -2,6 +2,7 @@ import os
 import subprocess
 import textwrap
 
+import pkg_resources
 import pytest
 import zc.buildout.buildout
 import zc.buildout.configparser
@@ -265,3 +266,37 @@ def test_settings_defaults(tmp_path):
     assert settings.build_isolation is False
     assert settings.cache is True
     assert settings.cache_directory == tmp_path / "parts" / ".rocket"
+    assert settings.scan_index is True
+
+
+@pytest.fixture
+def scanned_urls(tmp_path, monkeypatch):
+    """Look up a package the index does not have; return the URLs scanned."""
+    index = easy_install.AllowHostsPackageIndex
+    # Registered so that the patch of the extension is undone after the test.
+    monkeypatch.setattr(index, "scan_all", index.scan_all)
+    (tmp_path / "index").mkdir()
+    (tmp_path / "buildout.cfg").write_text("[buildout]\nparts =\n")
+    index_url = (tmp_path / "index").as_uri() + "/"
+
+    def lookup(*options):
+        cloptions = [("buildout", *o.split("=", 1)) for o in options]
+        buildout = zc.buildout.buildout.Buildout(
+            str(tmp_path / "buildout.cfg"), cloptions, use_user_defaults=False
+        )
+        rocket.extension(buildout)
+        urls = []
+        package_index = index(index_url)
+        monkeypatch.setattr(package_index, "scan_url", urls.append)
+        package_index.find_packages(pkg_resources.Requirement.parse("missing"))
+        return [url.removeprefix(index_url) for url in urls]
+
+    return lookup
+
+
+def test_index_is_scanned_by_default(scanned_urls):
+    assert scanned_urls() == ["missing/", ""]
+
+
+def test_index_scan_can_be_disabled(scanned_urls):
+    assert scanned_urls("rocket-scan-index=false") == ["missing/"]

@@ -2,7 +2,9 @@
 
 ## 0.1.3 (unreleased)
 
-- Nothing changed yet.
+- New option `rocket-scan-index`: set it to `false` and buildout no longer
+  downloads the list of all packages of the index (`Scanning index of all
+  packages (this may take a while)`) when a package has no index page.
 
 ## 0.1.2 (2026-11-14)
 

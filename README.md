@@ -58,6 +58,7 @@ line, e.g. `bin/buildout buildout:rocket-cache=false`.
 | `rocket-build-isolation`  | `false`               | `true` builds with pip build isolation, like plain buildout |
 | `rocket-cache`            | `true`                | reuse the files of unchanged develop eggs |
 | `rocket-cache-directory`  | `${buildout:parts-directory}/.rocket` | where the cache lives |
+| `rocket-scan-index`       | `true`                | `false` never downloads the list of all packages of the index, see below |
 
 ## When is a develop egg rebuilt?
 
@@ -81,12 +82,18 @@ changes that affect the generated metadata are **not** seen. Run once with
 
 ## Other things that make buildout slow
 
-Not handled by this extension, but worth checking in the buildout output:
+Worth checking in the buildout output:
 
-- `Scanning index of all packages (this may take a while)` — an unpinned
-  package was not found on its index page, so setuptools downloads and parses
-  the whole PyPI `/simple/` root page (~1 million links), once per part. Pin
-  the package listed in `Couldn't retrieve index page for ...`.
+- `Scanning index of all packages (this may take a while)` — a package was
+  not found on its index page, so buildout downloads and parses the whole
+  PyPI `/simple/` root page (~1 million links), once per part. This hits
+  packages the index does not have, like internal packages that come from
+  `find-links`. Set `rocket-scan-index = false` to skip that scan: the page
+  of a package is requested under its normalised name anyway, so the scan
+  finds nothing new on PyPI or any other PEP 503 index. Leave it at `true`
+  if your `index` is a plain directory listing instead. Without the option,
+  pin the package listed in `Couldn't retrieve index page for ...`, or run
+  with `newest = false`, so buildout does not ask the index for it.
 - `Upgraded: setuptools version ...; Restarting.` on every run — the
   setuptools pinned in `[versions]` differs from the one installed in the
   virtualenv that runs buildout. Make them match.
