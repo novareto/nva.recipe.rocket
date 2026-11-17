@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.4 (unreleased)
+
+- Nothing changed yet.
+
 ## 0.1.3 (2026-11-17)
 
 - New option `rocket-scan-index`: set it to `false` and buildout no longer
