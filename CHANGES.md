@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.3 (unreleased)
+## 0.1.3 (2026-11-17)
 
 - New option `rocket-scan-index`: set it to `false` and buildout no longer
   downloads the list of all packages of the index (`Scanning index of all
